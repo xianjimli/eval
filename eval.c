@@ -35,6 +35,11 @@ typedef enum
 {
     EVAL_TOKEN_TYPE_END,
     EVAL_TOKEN_TYPE_ADD,
+    EVAL_TOKEN_TYPE_G,
+    EVAL_TOKEN_TYPE_GE,
+    EVAL_TOKEN_TYPE_L,
+    EVAL_TOKEN_TYPE_LE,
+    EVAL_TOKEN_TYPE_E,
     EVAL_TOKEN_TYPE_SUBTRACT,
     EVAL_TOKEN_TYPE_MULTIPLY,
     EVAL_TOKEN_TYPE_DIVIDE,
@@ -302,6 +307,34 @@ static EvalResult get_token(EvalContext* ctx)
         }
         else switch (c)
         {
+        case '>':   {
+            char next_c = get_char(ctx);
+            if(next_c == '=') {
+                ctx->token.type = EVAL_TOKEN_TYPE_GE;
+            }else{
+                put_char(ctx);
+                ctx->token.type = EVAL_TOKEN_TYPE_G;
+            }
+            break;
+        }
+        case '<':   {
+            char next_c = get_char(ctx);
+            if(next_c == '=') {
+                ctx->token.type = EVAL_TOKEN_TYPE_LE;
+            }else{
+                put_char(ctx);
+                ctx->token.type = EVAL_TOKEN_TYPE_L;
+            }
+            break;
+        }
+        case '=':   {
+            ctx->token.type = EVAL_TOKEN_TYPE_E;
+            char next_c = get_char(ctx);
+            if(next_c != '=') {
+                put_char(ctx);
+            }
+            break;
+        }
         case '+':   ctx->token.type = EVAL_TOKEN_TYPE_ADD;              break;
         case '-':   ctx->token.type = EVAL_TOKEN_TYPE_SUBTRACT;         break;
         case '*':   ctx->token.type = EVAL_TOKEN_TYPE_MULTIPLY;         break;
@@ -483,7 +516,8 @@ static EvalResult parse_sum(EvalContext* ctx, float* output)
     
     for (;;)
     {
-        if ( ctx->token.type == EVAL_TOKEN_TYPE_ADD )
+        int type = ctx->token.type;
+        if ( type == EVAL_TOKEN_TYPE_ADD )
         {
             result = get_token(ctx);
             if ( result != EVAL_RESULT_OK ) return result;
@@ -493,7 +527,7 @@ static EvalResult parse_sum(EvalContext* ctx, float* output)
             
             lhs += rhs;
         }
-        else if ( ctx->token.type == EVAL_TOKEN_TYPE_SUBTRACT )
+        else if ( type == EVAL_TOKEN_TYPE_SUBTRACT )
         {
             result = get_token(ctx);
             if ( result != EVAL_RESULT_OK ) return result;
@@ -502,6 +536,31 @@ static EvalResult parse_sum(EvalContext* ctx, float* output)
             if ( result != EVAL_RESULT_OK ) return result;
             
             lhs -= rhs;
+        }
+        else if ( type == EVAL_TOKEN_TYPE_E
+                || type == EVAL_TOKEN_TYPE_LE
+                || type == EVAL_TOKEN_TYPE_L
+                || type == EVAL_TOKEN_TYPE_GE
+                || type == EVAL_TOKEN_TYPE_G
+                )
+        {
+            result = get_token(ctx);
+            if ( result != EVAL_RESULT_OK ) return result;
+            
+            result = parse_product(ctx, &rhs);
+            if ( result != EVAL_RESULT_OK ) return result;
+           
+            if(type == EVAL_TOKEN_TYPE_E) {
+                lhs = lhs == rhs;
+            }else if(type == EVAL_TOKEN_TYPE_LE) {
+                lhs = lhs <= rhs;
+            }else if(type == EVAL_TOKEN_TYPE_L) {
+                lhs = lhs < rhs;
+            }else if(type == EVAL_TOKEN_TYPE_GE) {
+                lhs = lhs >= rhs;
+            }else if(type == EVAL_TOKEN_TYPE_G) {
+                lhs = lhs > rhs;
+            }
         }
         else break;
     }
