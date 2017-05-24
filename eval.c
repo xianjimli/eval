@@ -473,6 +473,7 @@ static EvalResult parse_product(EvalContext* ctx, float* output)
     
     for (;;)
     {
+        int type = ctx->token.type;
         if ( ctx->token.type == EVAL_TOKEN_TYPE_MULTIPLY )
         {
             result = get_token(ctx);
@@ -492,6 +493,31 @@ static EvalResult parse_product(EvalContext* ctx, float* output)
             if ( result != EVAL_RESULT_OK ) return result;
             
             lhs /= rhs;
+        }
+        else if ( type == EVAL_TOKEN_TYPE_E
+                || type == EVAL_TOKEN_TYPE_LE
+                || type == EVAL_TOKEN_TYPE_L
+                || type == EVAL_TOKEN_TYPE_GE
+                || type == EVAL_TOKEN_TYPE_G
+                )
+        {
+            result = get_token(ctx);
+            if ( result != EVAL_RESULT_OK ) return result;
+            
+            result = parse_unary(ctx, &rhs);
+            if ( result != EVAL_RESULT_OK ) return result;
+           
+            if(type == EVAL_TOKEN_TYPE_E) {
+                lhs = lhs == rhs;
+            }else if(type == EVAL_TOKEN_TYPE_LE) {
+                lhs = lhs <= rhs;
+            }else if(type == EVAL_TOKEN_TYPE_L) {
+                lhs = lhs < rhs;
+            }else if(type == EVAL_TOKEN_TYPE_GE) {
+                lhs = lhs >= rhs;
+            }else if(type == EVAL_TOKEN_TYPE_G) {
+                lhs = lhs > rhs;
+            }
         }
         else break;
     }
@@ -536,31 +562,6 @@ static EvalResult parse_sum(EvalContext* ctx, float* output)
             if ( result != EVAL_RESULT_OK ) return result;
             
             lhs -= rhs;
-        }
-        else if ( type == EVAL_TOKEN_TYPE_E
-                || type == EVAL_TOKEN_TYPE_LE
-                || type == EVAL_TOKEN_TYPE_L
-                || type == EVAL_TOKEN_TYPE_GE
-                || type == EVAL_TOKEN_TYPE_G
-                )
-        {
-            result = get_token(ctx);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            result = parse_product(ctx, &rhs);
-            if ( result != EVAL_RESULT_OK ) return result;
-           
-            if(type == EVAL_TOKEN_TYPE_E) {
-                lhs = lhs == rhs;
-            }else if(type == EVAL_TOKEN_TYPE_LE) {
-                lhs = lhs <= rhs;
-            }else if(type == EVAL_TOKEN_TYPE_L) {
-                lhs = lhs < rhs;
-            }else if(type == EVAL_TOKEN_TYPE_GE) {
-                lhs = lhs >= rhs;
-            }else if(type == EVAL_TOKEN_TYPE_G) {
-                lhs = lhs > rhs;
-            }
         }
         else break;
     }
@@ -612,6 +613,7 @@ EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
 
 static EvalResult func_cos(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = cos(input);
     return EVAL_RESULT_OK;
 }
@@ -619,6 +621,7 @@ static EvalResult func_cos(float input, void* user_data, float* output)
 
 static EvalResult func_sin(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = sin(input);
     return EVAL_RESULT_OK;
 }
@@ -626,6 +629,7 @@ static EvalResult func_sin(float input, void* user_data, float* output)
 
 static EvalResult func_tan(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = tan(input);
     return EVAL_RESULT_OK;
 }
@@ -633,6 +637,7 @@ static EvalResult func_tan(float input, void* user_data, float* output)
 
 static EvalResult func_acos(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = acos(input);
     return EVAL_RESULT_OK;
 }
@@ -640,6 +645,7 @@ static EvalResult func_acos(float input, void* user_data, float* output)
 
 static EvalResult func_asin(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = asin(input);
     return EVAL_RESULT_OK;
 }
@@ -647,6 +653,7 @@ static EvalResult func_asin(float input, void* user_data, float* output)
 
 static EvalResult func_atan(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = atan(input);
     return EVAL_RESULT_OK;
 }
@@ -654,6 +661,7 @@ static EvalResult func_atan(float input, void* user_data, float* output)
 
 static EvalResult func_exp(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = exp(input);
     return EVAL_RESULT_OK;
 }
@@ -661,6 +669,7 @@ static EvalResult func_exp(float input, void* user_data, float* output)
 
 static EvalResult func_log(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = log(input);
     return EVAL_RESULT_OK;
 }
@@ -668,6 +677,7 @@ static EvalResult func_log(float input, void* user_data, float* output)
 
 static EvalResult func_log10(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = log10(input);
     return EVAL_RESULT_OK;
 }
@@ -675,6 +685,7 @@ static EvalResult func_log10(float input, void* user_data, float* output)
 
 static EvalResult func_log2(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = log2(input);
     return EVAL_RESULT_OK;
 }
@@ -682,6 +693,7 @@ static EvalResult func_log2(float input, void* user_data, float* output)
 
 static EvalResult func_sqrt(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = sqrt(input);
     return EVAL_RESULT_OK;
 }
@@ -689,6 +701,7 @@ static EvalResult func_sqrt(float input, void* user_data, float* output)
 
 static EvalResult func_cbrt(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = cbrt(input);
     return EVAL_RESULT_OK;
 }
@@ -696,6 +709,7 @@ static EvalResult func_cbrt(float input, void* user_data, float* output)
 
 static EvalResult func_ceil(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = ceil(input);
     return EVAL_RESULT_OK;
 }
@@ -710,6 +724,7 @@ static EvalResult func_floor(float input, void* user_data, float* output)
 
 static EvalResult func_round(float input, void* user_data, float* output)
 {
+    (void)user_data;
     *output = round(input);
     return EVAL_RESULT_OK;
 }
@@ -717,6 +732,7 @@ static EvalResult func_round(float input, void* user_data, float* output)
 
 static EvalFunc default_get_func(const char* name, void* user_data)
 {
+    (void)user_data;
     static const EvalFunctionEntry FUNCTIONS[] =
     {
         {"cos", func_cos},
@@ -806,6 +822,5 @@ const char* eval_result_to_string(EvalResult result)
         "expected close bracket"
     };
     
-    return ((result >= 0) && (result < N_EVAL_RESULT_CODES)) ?
-            STRS[result] : "undefined error";
+    return ((result < N_EVAL_RESULT_CODES)) ?  STRS[result] : "undefined error";
 }
