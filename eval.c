@@ -58,7 +58,7 @@ typedef struct
     
     union
     {
-        float number;
+        double number;
         char name[EVAL_MAX_NAME_LENGTH];
         
     } value;
@@ -77,7 +77,7 @@ typedef struct
 typedef struct
 {
     const char* name;
-    float value;
+    double value;
     
 } EvalVariableEntry;
 
@@ -93,7 +93,7 @@ typedef struct
 } EvalContext;
 
 
-static EvalResult parse_expr(EvalContext* ctx, float* output);
+static EvalResult parse_expr(EvalContext* ctx, double* output);
 
 
 static int is_digit(char c)
@@ -143,9 +143,9 @@ static void put_char(EvalContext* ctx)
 static EvalResult get_number(EvalContext* ctx)
 {
     char c;
-    float value;
+    double value;
     long exp;
-    float power;
+    double power;
     
     value = 0.0f;
     exp = 0;
@@ -328,8 +328,8 @@ static EvalResult get_token(EvalContext* ctx)
             break;
         }
         case '=':   {
-            ctx->token.type = EVAL_TOKEN_TYPE_E;
             char next_c = get_char(ctx);
+            ctx->token.type = EVAL_TOKEN_TYPE_E;
             if(next_c != '=') {
                 put_char(ctx);
             }
@@ -350,7 +350,7 @@ static EvalResult get_token(EvalContext* ctx)
 }
 
 
-static EvalResult parse_term(EvalContext* ctx, float* output)
+static EvalResult parse_term(EvalContext* ctx, double* output)
 {
     EvalResult result;
     
@@ -374,7 +374,7 @@ static EvalResult parse_term(EvalContext* ctx, float* output)
     else if ( ctx->token.type == EVAL_TOKEN_TYPE_FUNC )
     {
         EvalFunc func;
-        float arg;
+        double arg;
         
         if ( !ctx->hooks || !ctx->hooks->get_func )
         {
@@ -427,11 +427,11 @@ static EvalResult parse_term(EvalContext* ctx, float* output)
 }
 
 
-static EvalResult parse_unary(EvalContext* ctx, float* output)
+static EvalResult parse_unary(EvalContext* ctx, double* output)
 {
     EvalResult result;
     int neg;
-    float value;
+    double value;
     
     neg = 0;
     value = 0.0f;
@@ -459,11 +459,11 @@ static EvalResult parse_unary(EvalContext* ctx, float* output)
 }
 
 
-static EvalResult parse_product(EvalContext* ctx, float* output)
+static EvalResult parse_product(EvalContext* ctx, double* output)
 {
     EvalResult result;
-    float lhs;
-    float rhs;
+    double lhs;
+    double rhs;
     
     lhs = 0.0f;
     rhs = 0.0f;
@@ -528,11 +528,11 @@ static EvalResult parse_product(EvalContext* ctx, float* output)
 }
 
 
-static EvalResult parse_sum(EvalContext* ctx, float* output)
+static EvalResult parse_sum(EvalContext* ctx, double* output)
 {
     EvalResult result;
-    float lhs;
-    float rhs;
+    double lhs;
+    double rhs;
     
     lhs = 0.0f;
     rhs = 0.0f;
@@ -572,7 +572,7 @@ static EvalResult parse_sum(EvalContext* ctx, float* output)
 }
 
 
-static EvalResult parse_expr(EvalContext* ctx, float* output)
+static EvalResult parse_expr(EvalContext* ctx, double* output)
 {
     EvalResult result;
     
@@ -590,7 +590,7 @@ static EvalResult parse_expr(EvalContext* ctx, float* output)
 
 
 EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
-        void* user_data, float* output)
+        void* user_data, double* output)
 {
     EvalContext ctx;
     EvalResult result;
@@ -611,7 +611,7 @@ EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
 }
 
 
-static EvalResult func_cos(float input, void* user_data, float* output)
+static EvalResult func_cos(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = cos(input);
@@ -619,7 +619,7 @@ static EvalResult func_cos(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_sin(float input, void* user_data, float* output)
+static EvalResult func_sin(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = sin(input);
@@ -627,7 +627,7 @@ static EvalResult func_sin(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_tan(float input, void* user_data, float* output)
+static EvalResult func_tan(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = tan(input);
@@ -635,7 +635,7 @@ static EvalResult func_tan(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_acos(float input, void* user_data, float* output)
+static EvalResult func_acos(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = acos(input);
@@ -643,7 +643,7 @@ static EvalResult func_acos(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_asin(float input, void* user_data, float* output)
+static EvalResult func_asin(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = asin(input);
@@ -651,7 +651,7 @@ static EvalResult func_asin(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_atan(float input, void* user_data, float* output)
+static EvalResult func_atan(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = atan(input);
@@ -659,7 +659,7 @@ static EvalResult func_atan(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_exp(float input, void* user_data, float* output)
+static EvalResult func_exp(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = exp(input);
@@ -667,7 +667,7 @@ static EvalResult func_exp(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_log(float input, void* user_data, float* output)
+static EvalResult func_log(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = log(input);
@@ -675,7 +675,7 @@ static EvalResult func_log(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_log10(float input, void* user_data, float* output)
+static EvalResult func_log10(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = log10(input);
@@ -683,7 +683,7 @@ static EvalResult func_log10(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_log2(float input, void* user_data, float* output)
+static EvalResult func_log2(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = log2(input);
@@ -691,7 +691,7 @@ static EvalResult func_log2(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_sqrt(float input, void* user_data, float* output)
+static EvalResult func_sqrt(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = sqrt(input);
@@ -699,7 +699,7 @@ static EvalResult func_sqrt(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_cbrt(float input, void* user_data, float* output)
+static EvalResult func_cbrt(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = cbrt(input);
@@ -707,7 +707,7 @@ static EvalResult func_cbrt(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_ceil(float input, void* user_data, float* output)
+static EvalResult func_ceil(double input, void* user_data, double* output)
 {
     (void)user_data;
     *output = ceil(input);
@@ -715,17 +715,18 @@ static EvalResult func_ceil(float input, void* user_data, float* output)
 }
 
 
-static EvalResult func_floor(float input, void* user_data, float* output)
+static EvalResult func_floor(double input, void* user_data, double* output)
 {
     *output = floor(input);
+    (void)user_data;
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_round(float input, void* user_data, float* output)
+static EvalResult func_round(double input, void* user_data, double* output)
 {
-    (void)user_data;
     *output = round(input);
+    (void)user_data;
     return EVAL_RESULT_OK;
 }
 
@@ -765,7 +766,7 @@ static EvalFunc default_get_func(const char* name, void* user_data)
 }
 
 
-static EvalResult default_get_variable(const char* name, void* user_data, float* output)
+static EvalResult default_get_variable(const char* name, void* user_data, double* output)
 {
     static const EvalVariableEntry VARIABLES[] =
     {
@@ -777,6 +778,7 @@ static EvalResult default_get_variable(const char* name, void* user_data, float*
     const EvalVariableEntry* i = VARIABLES;
     const EvalVariableEntry* e = i + (sizeof(VARIABLES) / sizeof(*VARIABLES));
     
+    (void)user_data;
     while (i != e)
     {
         if ( strcmp(i->name, name) == 0 )

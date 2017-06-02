@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
     if ( argc >= 2 )
     {
         EvalResult result;
-        float output;
+        double output;
         
         output = 0.0f;
         result = eval_execute(argv[1], eval_default_hooks(), 0, &output);

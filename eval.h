@@ -54,20 +54,20 @@ typedef enum
 } EvalResult;
 
 
-typedef EvalResult (*EvalFunc) (float input, void* user_data, float* output);
+typedef EvalResult (*EvalFunc) (double input, void* user_data, double* output);
 
 
 typedef struct
 {
     EvalFunc (*get_func) (const char* name, void* user_data);
     
-    EvalResult (*get_variable) (const char* name, void* user_data, float* output);
+    EvalResult (*get_variable) (const char* name, void* user_data, double* output);
     
 } EvalHooks;
 
 
 EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
-        void* user_data, float* output);
+        void* user_data, double* output);
 
 const EvalHooks* eval_default_hooks(void);
 
