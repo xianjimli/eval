@@ -683,13 +683,6 @@ static EvalResult func_log10(double input, void* user_data, double* output)
 }
 
 
-static EvalResult func_log2(double input, void* user_data, double* output)
-{
-    (void)user_data;
-    *output = log2(input);
-    return EVAL_RESULT_OK;
-}
-
 
 static EvalResult func_sqrt(double input, void* user_data, double* output)
 {
@@ -697,15 +690,6 @@ static EvalResult func_sqrt(double input, void* user_data, double* output)
     *output = sqrt(input);
     return EVAL_RESULT_OK;
 }
-
-
-static EvalResult func_cbrt(double input, void* user_data, double* output)
-{
-    (void)user_data;
-    *output = cbrt(input);
-    return EVAL_RESULT_OK;
-}
-
 
 static EvalResult func_ceil(double input, void* user_data, double* output)
 {
@@ -725,7 +709,7 @@ static EvalResult func_floor(double input, void* user_data, double* output)
 
 static EvalResult func_round(double input, void* user_data, double* output)
 {
-    *output = round(input);
+    *output = floor(input+0.5);
     (void)user_data;
     return EVAL_RESULT_OK;
 }
@@ -733,7 +717,6 @@ static EvalResult func_round(double input, void* user_data, double* output)
 
 static EvalFunc default_get_func(const char* name, void* user_data)
 {
-    (void)user_data;
     static const EvalFunctionEntry FUNCTIONS[] =
     {
         {"cos", func_cos},
@@ -745,9 +728,7 @@ static EvalFunc default_get_func(const char* name, void* user_data)
         {"exp", func_exp},
         {"log", func_log},
         {"log10", func_log10},
-        {"log2", func_log2},
         {"sqrt", func_sqrt},
-        {"cbrt", func_cbrt},
         {"ceil", func_ceil},
         {"floor", func_floor},
         {"round", func_round}
@@ -765,6 +746,18 @@ static EvalFunc default_get_func(const char* name, void* user_data)
     return 0;
 }
 
+
+#ifndef _HUGE_ENUF
+    #define _HUGE_ENUF  1e+300 
+#endif
+
+#ifndef INFINITY
+#define INFINITY   ((float)(_HUGE_ENUF * _HUGE_ENUF))
+#endif/*INFINITY*/
+
+#ifndef NAN
+#define NAN        ((float)(INFINITY * 0.0F))
+#endif/*NAN*/
 
 static EvalResult default_get_variable(const char* name, void* user_data, double* output)
 {
@@ -798,8 +791,8 @@ const EvalHooks* eval_default_hooks(void)
 {
     static const EvalHooks HOOKS =
     {
-        .get_func = default_get_func,
-        .get_variable = default_get_variable
+        default_get_func,
+        default_get_variable
     };
     
     return &HOOKS;
