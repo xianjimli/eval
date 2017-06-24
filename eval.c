@@ -27,9 +27,9 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "eval.h"
-
 
 typedef enum
 {
@@ -39,7 +39,14 @@ typedef enum
     EVAL_TOKEN_TYPE_GE,
     EVAL_TOKEN_TYPE_L,
     EVAL_TOKEN_TYPE_LE,
+    EVAL_TOKEN_TYPE_NE,
     EVAL_TOKEN_TYPE_E,
+    EVAL_TOKEN_TYPE_NOT,
+    EVAL_TOKEN_TYPE_OR,
+    EVAL_TOKEN_TYPE_AND,
+    EVAL_TOKEN_TYPE_BITS_NOT,
+    EVAL_TOKEN_TYPE_BITS_OR,
+    EVAL_TOKEN_TYPE_BITS_AND,
     EVAL_TOKEN_TYPE_SUBTRACT,
     EVAL_TOKEN_TYPE_MULTIPLY,
     EVAL_TOKEN_TYPE_DIVIDE,
@@ -47,10 +54,10 @@ typedef enum
     EVAL_TOKEN_TYPE_CLOSE_BRACKET,
     EVAL_TOKEN_TYPE_NUMBER,
     EVAL_TOKEN_TYPE_FUNC,
+    EVAL_TOKEN_TYPE_STRING,
     EVAL_TOKEN_TYPE_VARIABLE
     
 } EvalTokenType;
-
 
 typedef struct
 {
@@ -60,11 +67,9 @@ typedef struct
     {
         double number;
         char name[EVAL_MAX_NAME_LENGTH];
-        
     } value;
     
 } EvalToken;
-
 
 typedef struct
 {
@@ -89,12 +94,10 @@ typedef struct
     const char* input;
     size_t stack_level;
     EvalToken token;
-    
+    ExprStr str;    
 } EvalContext;
 
-
-static EvalResult parse_expr(EvalContext* ctx, double* output);
-
+static EvalResult parse_expr(EvalContext* ctx, ExprValue* output);
 
 static int is_digit(char c)
 {
@@ -109,24 +112,20 @@ static int is_name_start(char c)
             (c == '_');
 }
 
-
 static int is_name(char c)
 {
     return is_name_start(c) || is_digit(c);
 }
-
 
 static int is_exp(char c)
 {
     return (c == 'e') || (c == 'E');
 }
 
-
 static int is_dp(char c)
 {
     return (c == '.');
 }
-
 
 static char get_char(EvalContext* ctx)
 {
@@ -137,6 +136,269 @@ static char get_char(EvalContext* ctx)
 static void put_char(EvalContext* ctx)
 {
     ctx->input--;
+}
+
+static EvalResult expr_str_init(ExprStr* str, size_t capacity) {
+    str->size = 0;
+    str->capacity = capacity;
+    str->str = (char*)malloc(capacity+1);
+
+    return str->str ? EVAL_RESULT_OK : EVAL_RESULT_OOM;
+}
+
+static EvalResult expr_str_append_str(ExprStr* str, const char* other, size_t len) {
+   size_t size = str->size + len;
+   if(size >= str->capacity) {
+       size_t capacity = size;
+       char* s = (char*)realloc(str->str, capacity+1);
+       if(!s) {
+           return EVAL_RESULT_OOM;
+       }
+       str->str = s;
+       str->capacity = capacity;
+   }
+
+   memcpy(str->str+str->size, other, len);
+   str->size = size;
+   str->str[size] = '\0';
+
+   return EVAL_RESULT_OK;
+}
+
+static EvalResult expr_str_append_char(ExprStr* str, char c) {
+    return expr_str_append_str(str, &c, 1);
+}
+
+static const char* number_to_string(double v, char* str, size_t capacity) {
+    if(ceilf(v) == v) {
+        snprintf(str, capacity, "%d", (unsigned int)v);
+    }else{
+        snprintf(str, capacity, "%lf", v);
+    }
+}
+
+static EvalResult expr_value_to_string(ExprValue* v) {
+    if(v->type == EXPR_VALUE_TYPE_NUMBER) {
+        size_t capacity = 63;
+        char* str = (char*)malloc(capacity+1);
+        if(str) {
+            number_to_string(v->v.val, str, capacity);
+
+            v->v.str.str = str;
+            v->v.str.size = strlen(str);
+            v->v.str.capacity = capacity;
+            v->type = EXPR_VALUE_TYPE_STRING;
+        }else{
+            return EVAL_RESULT_OOM;
+        }
+    }
+
+    return EVAL_RESULT_OK;
+}
+
+static EvalResult expr_value_append_string(ExprValue* v, const char* str, size_t len) {
+   if(expr_value_to_string(v) == EVAL_RESULT_OK) {
+       return expr_str_append_str(&(v->v.str), str, len);
+   }
+   
+   return EVAL_RESULT_OOM;
+}
+
+void expr_value_init(ExprValue* v) {
+    memset(v, 0x00, sizeof(ExprValue));
+    v->type = EXPR_VALUE_TYPE_NUMBER;
+
+    return;
+}
+
+EvalResult expr_value_set_number(ExprValue* v, double val) {
+    if(v->type == EXPR_VALUE_TYPE_STRING) {
+        free(v->v.str.str);
+    }
+
+    v->v.val = val;
+    v->type = EXPR_VALUE_TYPE_NUMBER;
+
+    return EVAL_RESULT_OK;
+}
+
+EvalResult expr_value_set_string(ExprValue* v, const char* str, size_t len) {
+    if(v->type == EXPR_VALUE_TYPE_NUMBER) {
+        v->v.str.str = (char*)malloc(len+1);
+        v->v.str.capacity = len;
+        v->type = EXPR_VALUE_TYPE_STRING;
+    }
+
+    v->v.str.size = 0;
+    expr_value_append_string(v, str, len);
+
+    return EVAL_RESULT_OK;
+}
+
+static EvalResult expr_value_to_number(ExprValue* v) {
+    if(v->type == EXPR_VALUE_TYPE_STRING) {
+        double val = atof(v->v.str.str);
+        return expr_value_set_number(v, val);
+    }
+
+    return EVAL_RESULT_OK;
+}
+
+double expr_value_get_number(const ExprValue* v) {
+    if(v->type == EXPR_VALUE_TYPE_STRING) {
+        return atof(v->v.str.str);
+    }else{
+        return v->v.val;
+    }
+}
+
+const char* expr_value_get_string(const ExprValue* v) {
+    if(v->type == EXPR_VALUE_TYPE_STRING) {
+        return (v->v.str.str);
+    }else{
+        return NULL;
+    }
+}
+
+static EvalResult expr_value_op(ExprValue* a, ExprValue* b, EvalTokenType op) {
+    if(a->type == EXPR_VALUE_TYPE_STRING || b->type == EXPR_VALUE_TYPE_STRING) {
+        expr_value_to_string(a);
+        expr_value_to_string(b);
+        switch(op) {
+            case EVAL_TOKEN_TYPE_MULTIPLY : {
+                expr_value_append_string(a, "*", 1);
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_OR: {
+                int ret = a->v.str.size || b->v.str.size;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_AND: {
+                int ret = a->v.str.size && b->v.str.size;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_BITS_OR: {
+                expr_value_append_string(a, "|", 1);
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_BITS_AND: {
+                expr_value_append_string(a, "&", 1);
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_DIVIDE : {
+                expr_value_append_string(a, "/", 1);
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_SUBTRACT: {
+                expr_value_append_string(a, "-", 1);
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_ADD: {
+                expr_value_append_string(a, b->v.str.str, b->v.str.size);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_E : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) == 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_G : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) > 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_L : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) < 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_LE : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) <= 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_NE : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) != 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            case EVAL_TOKEN_TYPE_GE : {
+                int ret = strcmp(a->v.str.str, b->v.str.str) >= 0;
+                expr_value_set_number(a, ret);
+                break;
+            }
+            default:break;
+        }
+    }else {
+        expr_value_to_number(a);
+        expr_value_to_number(b);
+        switch(op) {
+            case EVAL_TOKEN_TYPE_MULTIPLY : {
+                a->v.val *= b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_OR: {
+                a->v.val = a->v.val || b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_AND: {
+                a->v.val = a->v.val && b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_BITS_OR: {
+                a->v.val = (unsigned int)a->v.val | (unsigned int)b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_BITS_AND: {
+                a->v.val = (unsigned int)a->v.val & (unsigned int)b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_DIVIDE : {
+                a->v.val /= b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_ADD: {
+                a->v.val += b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_SUBTRACT: {
+                a->v.val -= b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_E : {
+                a->v.val = a->v.val == b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_G : {
+                a->v.val = a->v.val > b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_LE : {
+                a->v.val = a->v.val <= b->v.val;
+                break;
+            }
+            case EVAL_TOKEN_TYPE_GE : {
+                a->v.val = a->v.val >= b->v.val;
+                break;
+            }
+            default:break;
+        }
+    }
+    
+    return EVAL_RESULT_OK;
+}
+
+void expr_value_clear(ExprValue* v) {
+    if(v->type == EXPR_VALUE_TYPE_STRING) {
+        expr_value_set_number(v, 0);
+    }
 }
 
 
@@ -272,6 +534,23 @@ static EvalResult get_name(EvalContext* ctx, EvalTokenType type)
     return EVAL_RESULT_OK;
 }
 
+static EvalResult get_string(EvalContext* ctx, EvalTokenType type)
+{
+    char c;
+    ctx->str.size = 0;
+    for (;;)
+    {
+        c = get_char(ctx);
+        if (c == '"' ) {
+            break;
+        }
+        expr_str_append_char(&(ctx->str), c);
+    }
+    
+    ctx->token.type = type;
+    
+    return EVAL_RESULT_OK;
+}
 
 static EvalResult get_token(EvalContext* ctx)
 {
@@ -305,6 +584,10 @@ static EvalResult get_token(EvalContext* ctx)
         {
             return get_name(ctx, EVAL_TOKEN_TYPE_VARIABLE);
         }
+        else if ( c == '"' )
+        {
+            return get_string(ctx, EVAL_TOKEN_TYPE_STRING);
+        }
         else switch (c)
         {
         case '>':   {
@@ -327,6 +610,36 @@ static EvalResult get_token(EvalContext* ctx)
             }
             break;
         }
+        case '!':   {
+            char next_c = get_char(ctx);
+            if(next_c == '=') {
+                ctx->token.type = EVAL_TOKEN_TYPE_NE;
+            }else{
+                put_char(ctx);
+                ctx->token.type = EVAL_TOKEN_TYPE_NOT;
+            }
+            break;
+        }
+        case '&':   {
+            char next_c = get_char(ctx);
+            if(next_c == '&') {
+                ctx->token.type = EVAL_TOKEN_TYPE_AND;
+            }else{
+                put_char(ctx);
+                ctx->token.type = EVAL_TOKEN_TYPE_BITS_AND;
+            }
+            break;
+        }
+        case '|':   {
+            char next_c = get_char(ctx);
+            if(next_c == '|') {
+                ctx->token.type = EVAL_TOKEN_TYPE_OR;
+            }else{
+                put_char(ctx);
+                ctx->token.type = EVAL_TOKEN_TYPE_BITS_OR;
+            }
+            break;
+        }
         case '=':   {
             char next_c = get_char(ctx);
             ctx->token.type = EVAL_TOKEN_TYPE_E;
@@ -335,6 +648,7 @@ static EvalResult get_token(EvalContext* ctx)
             }
             break;
         }
+        case '~':   ctx->token.type = EVAL_TOKEN_TYPE_BITS_NOT;         break;
         case '+':   ctx->token.type = EVAL_TOKEN_TYPE_ADD;              break;
         case '-':   ctx->token.type = EVAL_TOKEN_TYPE_SUBTRACT;         break;
         case '*':   ctx->token.type = EVAL_TOKEN_TYPE_MULTIPLY;         break;
@@ -350,13 +664,17 @@ static EvalResult get_token(EvalContext* ctx)
 }
 
 
-static EvalResult parse_term(EvalContext* ctx, double* output)
+static EvalResult parse_term(EvalContext* ctx, ExprValue* output)
 {
     EvalResult result;
     
     if ( ctx->token.type == EVAL_TOKEN_TYPE_NUMBER )
     {
-        *output = ctx->token.value.number;
+        expr_value_set_number(output, ctx->token.value.number);
+    }
+    else if ( ctx->token.type == EVAL_TOKEN_TYPE_STRING)
+    {
+        expr_value_set_string(output, ctx->str.str, ctx->str.size);
     }
     else if ( ctx->token.type == EVAL_TOKEN_TYPE_OPEN_BRACKET )
     {
@@ -374,8 +692,9 @@ static EvalResult parse_term(EvalContext* ctx, double* output)
     else if ( ctx->token.type == EVAL_TOKEN_TYPE_FUNC )
     {
         EvalFunc func;
-        double arg;
-        
+        ExprValue arg;
+        expr_value_init(&arg);
+
         if ( !ctx->hooks || !ctx->hooks->get_func )
         {
             return EVAL_RESULT_UNDEFINED_FUNCTION;
@@ -395,8 +714,6 @@ static EvalResult parse_term(EvalContext* ctx, double* output)
         result = get_token(ctx);
         if ( result != EVAL_RESULT_OK ) return result;
         
-        arg = 0.0f;
-        
         result = parse_expr(ctx, &arg);
         if ( result != EVAL_RESULT_OK ) return result;
         
@@ -405,7 +722,7 @@ static EvalResult parse_term(EvalContext* ctx, double* output)
             return EVAL_RESULT_EXPECTED_CLOSE_BRACKET;
         }
         
-        result = func(arg, ctx->user_data, output);
+        result = func(&arg, ctx->user_data, output);
         if ( result != EVAL_RESULT_OK ) return result;
     }
     else if ( ctx->token.type == EVAL_TOKEN_TYPE_VARIABLE )
@@ -426,80 +743,96 @@ static EvalResult parse_term(EvalContext* ctx, double* output)
     return get_token(ctx);
 }
 
-
-static EvalResult parse_unary(EvalContext* ctx, double* output)
+static EvalResult parse_unary(EvalContext* ctx, ExprValue* output)
 {
     EvalResult result;
-    int neg;
-    double value;
+    int neg = 0;
+    int not = 0;
+    int bit_not = 0;
+    ExprValue value;
     
-    neg = 0;
-    value = 0.0f;
-    
+    expr_value_init(&value);
+
     for (;;)
     {
-        if ( ctx->token.type == EVAL_TOKEN_TYPE_SUBTRACT )
+        if ( ctx->token.type == EVAL_TOKEN_TYPE_NOT) {
+            not = !not;
+            
+            result = get_token(ctx);
+            if ( result != EVAL_RESULT_OK ) return result;
+        }
+        else if ( ctx->token.type == EVAL_TOKEN_TYPE_BITS_NOT) {
+            bit_not = !bit_not; 
+
+            result = get_token(ctx);
+            if ( result != EVAL_RESULT_OK ) return result;
+        }
+        else if ( ctx->token.type == EVAL_TOKEN_TYPE_SUBTRACT )
         {
             neg = !neg;
             
             result = get_token(ctx);
             if ( result != EVAL_RESULT_OK ) return result;
         }
-        else break;
+        else {
+            break;
+        }
     }
     
     result = parse_term(ctx, &value);
     if ( result != EVAL_RESULT_OK ) return result;
     
-    if ( neg ) value = -value;
-    
+    if(value.type == EXPR_VALUE_TYPE_NUMBER) {
+        if (neg) {
+            value.v.val = -value.v.val;
+        }
+        if (not) {
+            value.v.val = !value.v.val;
+        }
+        if (bit_not) {
+            value.v.val = ~(unsigned int)value.v.val;
+        }
+    }
+    if(value.type == EXPR_VALUE_TYPE_STRING) {
+        if (not) {
+            expr_value_set_number(&value, !value.v.str.size);
+        }
+    }
+
     *output = value;
     
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult parse_product(EvalContext* ctx, double* output)
+static EvalResult parse_product(EvalContext* ctx, ExprValue* output)
 {
     EvalResult result;
-    double lhs;
-    double rhs;
+    ExprValue lhs;
+    ExprValue rhs;
     
-    lhs = 0.0f;
-    rhs = 0.0f;
-    
+    expr_value_init(&lhs);
+    expr_value_init(&rhs);
+
     result = parse_unary(ctx, &lhs);
     if ( result != EVAL_RESULT_OK ) return result;
     
     for (;;)
     {
         int type = ctx->token.type;
-        if ( ctx->token.type == EVAL_TOKEN_TYPE_MULTIPLY )
-        {
-            result = get_token(ctx);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            result = parse_unary(ctx, &rhs);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            lhs *= rhs;
-        }
-        else if ( ctx->token.type == EVAL_TOKEN_TYPE_DIVIDE )
-        {
-            result = get_token(ctx);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            result = parse_unary(ctx, &rhs);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            lhs /= rhs;
-        }
-        else if ( type == EVAL_TOKEN_TYPE_E
-                || type == EVAL_TOKEN_TYPE_LE
+        if ( type == EVAL_TOKEN_TYPE_MULTIPLY
+                || type == EVAL_TOKEN_TYPE_DIVIDE 
+                || type == EVAL_TOKEN_TYPE_E 
                 || type == EVAL_TOKEN_TYPE_L
-                || type == EVAL_TOKEN_TYPE_GE
                 || type == EVAL_TOKEN_TYPE_G
-                )
+                || type == EVAL_TOKEN_TYPE_NE 
+                || type == EVAL_TOKEN_TYPE_LE 
+                || type == EVAL_TOKEN_TYPE_GE
+                || type == EVAL_TOKEN_TYPE_OR
+                || type == EVAL_TOKEN_TYPE_AND
+                || type == EVAL_TOKEN_TYPE_BITS_OR
+                || type == EVAL_TOKEN_TYPE_BITS_AND
+           )
         {
             result = get_token(ctx);
             if ( result != EVAL_RESULT_OK ) return result;
@@ -507,72 +840,56 @@ static EvalResult parse_product(EvalContext* ctx, double* output)
             result = parse_unary(ctx, &rhs);
             if ( result != EVAL_RESULT_OK ) return result;
            
-            if(type == EVAL_TOKEN_TYPE_E) {
-                lhs = lhs == rhs;
-            }else if(type == EVAL_TOKEN_TYPE_LE) {
-                lhs = lhs <= rhs;
-            }else if(type == EVAL_TOKEN_TYPE_L) {
-                lhs = lhs < rhs;
-            }else if(type == EVAL_TOKEN_TYPE_GE) {
-                lhs = lhs >= rhs;
-            }else if(type == EVAL_TOKEN_TYPE_G) {
-                lhs = lhs > rhs;
-            }
+            expr_value_op(&lhs, &rhs, type);
         }
-        else break;
+        else {
+            break;
+        }
     }
     
     *output = lhs;
-    
+    expr_value_clear(&rhs);
+
     return EVAL_RESULT_OK;
 }
 
-
-static EvalResult parse_sum(EvalContext* ctx, double* output)
+static EvalResult parse_sum(EvalContext* ctx, ExprValue* output)
 {
+    ExprValue lhs;
+    ExprValue rhs;
     EvalResult result;
-    double lhs;
-    double rhs;
     
-    lhs = 0.0f;
-    rhs = 0.0f;
-    
+    expr_value_init(&lhs);
+    expr_value_init(&rhs);
+
     result = parse_product(ctx, &lhs);
     if ( result != EVAL_RESULT_OK ) return result;
     
     for (;;)
     {
         int type = ctx->token.type;
-        if ( type == EVAL_TOKEN_TYPE_ADD )
+        if ( type == EVAL_TOKEN_TYPE_ADD || type == EVAL_TOKEN_TYPE_SUBTRACT)
         {
             result = get_token(ctx);
             if ( result != EVAL_RESULT_OK ) return result;
             
             result = parse_product(ctx, &rhs);
             if ( result != EVAL_RESULT_OK ) return result;
-            
-            lhs += rhs;
+          
+            expr_value_op(&lhs, &rhs, type);
+        }else{
+            break;
         }
-        else if ( type == EVAL_TOKEN_TYPE_SUBTRACT )
-        {
-            result = get_token(ctx);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            result = parse_product(ctx, &rhs);
-            if ( result != EVAL_RESULT_OK ) return result;
-            
-            lhs -= rhs;
-        }
-        else break;
     }
     
     *output = lhs;
+    expr_value_clear(&rhs);
     
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult parse_expr(EvalContext* ctx, double* output)
+static EvalResult parse_expr(EvalContext* ctx, ExprValue* output)
 {
     EvalResult result;
     
@@ -590,16 +907,18 @@ static EvalResult parse_expr(EvalContext* ctx, double* output)
 
 
 EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
-        void* user_data, double* output)
+        void* user_data, ExprValue* output)
 {
     EvalContext ctx;
     EvalResult result;
     
+    expr_str_init(&ctx.str, 100);
+
     ctx.hooks = hooks;
     ctx.user_data = user_data;
     ctx.input = expression;
     ctx.stack_level = 0;
-    
+     
     result = get_token(&ctx);
     if ( result != EVAL_RESULT_OK ) return result;
     
@@ -610,107 +929,146 @@ EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
             EVAL_RESULT_UNEXPECTED_CHAR;
 }
 
-
-static EvalResult func_cos(double input, void* user_data, double* output)
+static EvalResult func_number(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = cos(input);
+    if(input->type == EXPR_VALUE_TYPE_STRING) {
+        expr_value_set_number(output, atof(input->v.str.str));
+    }else{
+        expr_value_set_number(output, expr_value_get_number(input));
+    }
+
+    return EVAL_RESULT_OK;
+}
+
+static EvalResult func_strlen(const ExprValue* input, void* user_data, ExprValue* output)
+{
+    (void)user_data;
+    if(input->type == EXPR_VALUE_TYPE_STRING) {
+        expr_value_set_number(output, (input->v.str.size));
+    }else{
+        char buff[64];
+        number_to_string(input->v.val, buff, sizeof(buff));
+        expr_value_set_number(output, strlen(buff));
+    }
+
+    return EVAL_RESULT_OK;
+}
+
+static EvalResult func_string(const ExprValue* input, void* user_data, ExprValue* output)
+{
+    (void)user_data;
+    if(input->type == EXPR_VALUE_TYPE_STRING) {
+        expr_value_set_string(output, input->v.str.str, input->v.str.size);
+    }else{
+        expr_value_set_number(output, (expr_value_get_number(input)));
+        expr_value_to_string(output);
+    }
+
+    return EVAL_RESULT_OK;
+}
+
+static EvalResult func_cos(const ExprValue* input, void* user_data, ExprValue* output)
+{
+    (void)user_data;
+    expr_value_set_number(output, cos(expr_value_get_number(input)));
+
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_sin(double input, void* user_data, double* output)
+static EvalResult func_sin(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = sin(input);
+    expr_value_set_number(output, sin(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_tan(double input, void* user_data, double* output)
+static EvalResult func_tan(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = tan(input);
+    expr_value_set_number(output, tan(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_acos(double input, void* user_data, double* output)
+static EvalResult func_acos(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = acos(input);
+    expr_value_set_number(output, acos(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_asin(double input, void* user_data, double* output)
+static EvalResult func_asin(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = asin(input);
+    expr_value_set_number(output, asin(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_atan(double input, void* user_data, double* output)
+static EvalResult func_atan(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = atan(input);
+    expr_value_set_number(output, atan(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_exp(double input, void* user_data, double* output)
+static EvalResult func_exp(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = exp(input);
+    expr_value_set_number(output, exp(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_log(double input, void* user_data, double* output)
+static EvalResult func_log(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = log(input);
+    expr_value_set_number(output, log(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_log10(double input, void* user_data, double* output)
+static EvalResult func_log10(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = log10(input);
+    expr_value_set_number(output, log10(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
 
-static EvalResult func_sqrt(double input, void* user_data, double* output)
+static EvalResult func_sqrt(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = sqrt(input);
+    expr_value_set_number(output, sqrt(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
-static EvalResult func_ceil(double input, void* user_data, double* output)
+static EvalResult func_ceil(const ExprValue* input, void* user_data, ExprValue* output)
 {
     (void)user_data;
-    *output = ceil(input);
-    return EVAL_RESULT_OK;
-}
-
-
-static EvalResult func_floor(double input, void* user_data, double* output)
-{
-    *output = floor(input);
-    (void)user_data;
+    expr_value_set_number(output, ceil(expr_value_get_number(input)));
     return EVAL_RESULT_OK;
 }
 
 
-static EvalResult func_round(double input, void* user_data, double* output)
+static EvalResult func_floor(const ExprValue* input, void* user_data, ExprValue* output)
 {
-    *output = floor(input+0.5);
     (void)user_data;
+    expr_value_set_number(output, floor(expr_value_get_number(input)));
+    return EVAL_RESULT_OK;
+}
+
+
+static EvalResult func_round(const ExprValue* input, void* user_data, ExprValue* output)
+{
+    (void)user_data;
+    expr_value_set_number(output, floor(expr_value_get_number(input)+0.5));
     return EVAL_RESULT_OK;
 }
 
@@ -719,6 +1077,9 @@ static EvalFunc default_get_func(const char* name, void* user_data)
 {
     static const EvalFunctionEntry FUNCTIONS[] =
     {
+        {"number", func_number},
+        {"strlen", func_strlen},
+        {"string", func_string},
         {"cos", func_cos},
         {"sin", func_sin},
         {"tan", func_tan},
@@ -742,7 +1103,9 @@ static EvalFunc default_get_func(const char* name, void* user_data)
         if ( strcmp(i->name, name) == 0 ) return i->func;
         i++;
     }
-    
+
+    (void)user_data;
+
     return 0;
 }
 
@@ -759,7 +1122,7 @@ static EvalFunc default_get_func(const char* name, void* user_data)
 #define NAN        ((float)(INFINITY * 0.0F))
 #endif/*NAN*/
 
-static EvalResult default_get_variable(const char* name, void* user_data, double* output)
+static EvalResult default_get_variable(const char* name, void* user_data, ExprValue* output)
 {
     static const EvalVariableEntry VARIABLES[] =
     {
@@ -776,7 +1139,7 @@ static EvalResult default_get_variable(const char* name, void* user_data, double
     {
         if ( strcmp(i->name, name) == 0 )
         {
-            *output = i->value;
+            expr_value_set_number(output, i->value);
             return EVAL_RESULT_OK;
         }
         
@@ -819,3 +1182,4 @@ const char* eval_result_to_string(EvalResult result)
     
     return ((result < N_EVAL_RESULT_CODES)) ?  STRS[result] : "undefined error";
 }
+

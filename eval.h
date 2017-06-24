@@ -29,10 +29,27 @@
 
 #include <stddef.h>
 
-
-#define EVAL_MAX_NAME_LENGTH        16
 #define EVAL_MAX_STACK_DEPTH        8
+#define EVAL_MAX_NAME_LENGTH        16
 
+typedef enum _ExprValueType {
+    EXPR_VALUE_TYPE_NUMBER = 0,
+    EXPR_VALUE_TYPE_STRING
+}ExprValueType;
+
+typedef struct _ExprStr {
+    size_t size;
+    size_t capacity;
+    char* str;
+}ExprStr;
+
+typedef struct _ExprValue{
+    ExprValueType type;
+    union {
+        double  val;
+        ExprStr str;
+    }v;
+}ExprValue;
 
 typedef enum
 {
@@ -48,29 +65,32 @@ typedef enum
     EVAL_RESULT_UNDEFINED_VARIABLE,
     EVAL_RESULT_EXPECTED_OPEN_BRACKET,
     EVAL_RESULT_EXPECTED_CLOSE_BRACKET,
-    
+    EVAL_RESULT_OOM,    
     N_EVAL_RESULT_CODES
-    
 } EvalResult;
 
-
-typedef EvalResult (*EvalFunc) (double input, void* user_data, double* output);
-
+typedef EvalResult (*EvalFunc) (const ExprValue* input, void* user_data, ExprValue* output);
 
 typedef struct
 {
-    EvalFunc (*get_func) (const char* name, void* user_data);
-    
-    EvalResult (*get_variable) (const char* name, void* user_data, double* output);
-    
+    EvalFunc   (*get_func) (const char* name, void* user_data);
+    EvalResult (*get_variable) (const char* name, void* user_data, ExprValue* output);
 } EvalHooks;
 
-
-EvalResult eval_execute(const char* expression, const EvalHooks* hooks,
-        void* user_data, double* output);
+EvalResult eval_execute(const char* expr, const EvalHooks* hooks, void* ctx, ExprValue* output);
 
 const EvalHooks* eval_default_hooks(void);
 
 const char* eval_result_to_string(EvalResult result);
 
+void expr_value_init(ExprValue* v);
+void expr_value_clear(ExprValue* v);
+
+double expr_value_get_number(const ExprValue* v);
+EvalResult expr_value_set_number(ExprValue* v, double val);
+
+const char* expr_value_get_string(const ExprValue* v);
+EvalResult expr_value_set_string(ExprValue* v, const char* str, size_t len);
+
 #endif // EVAL_H
+

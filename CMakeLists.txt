@@ -20,9 +20,6 @@ else()
     ADD_DEFINITIONS(-D_CRT_SECURE_NO_WARNINGS -DHAVE_STRUCT_TIMESPEC)
 endif()
 
-add_executable(eval
-    main.c
-    eval.c
-)
-target_link_libraries(eval )
+add_executable(eval main.c eval.c)
+add_executable(eval_test test.c eval.c)
 
