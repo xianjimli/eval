@@ -21,5 +21,8 @@ else()
 endif()
 
 add_executable(eval main.c eval.c)
+target_link_libraries(eval ${SYS_LIBS}) 
+
 add_executable(eval_test test.c eval.c)
+target_link_libraries(eval_test ${SYS_LIBS}) 
 

@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
         
         if ( result == EVAL_RESULT_OK )
         {
-            if(output.type == EDATA_TYPE_STRING) {
+            if(output.type == EXPR_VALUE_TYPE_STRING) {
                 printf("string: %s\n", output.v.str.str);
             }else{
                 printf("number: %lf\n", output.v.val);

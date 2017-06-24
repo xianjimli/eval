@@ -13,6 +13,8 @@ static void test_str(const char* expr, const char* expect) {
     printf("%s %s\n", expr, eval_result_to_string(result));
     assert(result == EVAL_RESULT_OK);
     assert(output.type == EXPR_VALUE_TYPE_STRING && strcmp(output.v.str.str, expect) == 0); 
+
+    expr_value_clear(&output);
 }
 
 static void test_number(const char* expr, double expect) {
@@ -41,6 +43,7 @@ int main()
     test_number("\"1\" && !\"\"", 1);
     test_number("!\"\"", 1);
     test_number("!\"123\"", 0);
+    test_number("\"1\" && !\"\"", 1);
     
     /*string -> string*/
     test_str("\"1\"+\"2\"", "12");
@@ -88,6 +91,9 @@ int main()
 
     test_number("strlen(123)", 3);
     test_number("strlen(\"123\")", 3);
+
+    test_str("tolower(\"aBc\")", "abc");
+    test_str("toupper(\"aBc\")", "ABC");
 
     return 0;
 }
