@@ -9,9 +9,16 @@ Simple numerical expression evaluator
 - Single argument functions
 - Variable substitution
 
+(Jim extended version)
+- String compare and concat.
+- unit test program.
+
 ## Why?
 
 Because I needed a small expression evaluator for use in a Cortex-M4 based firmware project I was working on.
+
+(Jim extended version)
+I wrote a general C++ MVVM framework(Now works for Qt/EMWin), I use _eval_ in binding rule to eval property expression. 
 
 ## Syntax
 
@@ -25,6 +32,9 @@ func(arg)                   Function names follow the same convenion as variable
 ### Unary Operators
 ```
 -                           Negates operand.
+(Jim extended version)
+!                           boolean not
+~                           (unsigned int) bit not
 ```
 
 ### Binary Operators
@@ -33,6 +43,18 @@ func(arg)                   Function names follow the same convenion as variable
 -                           Subtracts right operand from left operand.
 *                           Multplies left operand by right operand.
 /                           Divides left operand by right operand.
+
+(Jim extended version)
+<
+<=
+==
+!=
+>
+>=
+|
+||
+& 
+&&
 ```
 
 ### Default Variables
@@ -61,5 +83,12 @@ cbrt
 ceil
 floor
 round
+
+(Jim extended version)
+strlen 
+tolower
+toupper
+string
+number
 ```
 
