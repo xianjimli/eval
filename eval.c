@@ -622,14 +622,22 @@ static EvalResult get_name(EvalContext *ctx, EvalTokenType type)
 static EvalResult get_string(EvalContext *ctx, EvalTokenType type)
 {
     char c;
+    char last_c = '\0';
     ctx->str.size = 0;
     for (;;)
     {
         c = get_char(ctx);
-        if (c == '"')
+        if(c == '\\') 
+        {
+            last_c = c;
+            continue;
+        }
+
+        if (c == '"' && last_c != '\\')
         {
             break;
         }
+        last_c = c;
         expr_str_append_char(&(ctx->str), c);
     }
 
