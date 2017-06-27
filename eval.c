@@ -34,6 +34,7 @@
 #include "eval.h"
 
 #ifdef WIN32
+#   define snprintf _snprintf
 #   define DIRECTORY_SEPARATOR_CHAR '\\'
 #else
 #   define DIRECTORY_SEPARATOR_CHAR '/'
