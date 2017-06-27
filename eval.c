@@ -33,6 +33,12 @@
 
 #include "eval.h"
 
+#ifdef WIN32
+#   define DIRECTORY_SEPARATOR_CHAR '\\'
+#else
+#   define DIRECTORY_SEPARATOR_CHAR '/'
+#endif
+
 typedef enum {
     EVAL_TOKEN_TYPE_END,
     EVAL_TOKEN_TYPE_ADD,
@@ -1098,6 +1104,28 @@ static EvalResult func_strlen(const ExprValue *input, void *user_data, ExprValue
     return EVAL_RESULT_OK;
 }
 
+static EvalResult func_path(const ExprValue *input, void *user_data, ExprValue *output)
+{
+    (void)user_data;
+    if (input->type == EXPR_VALUE_TYPE_STRING)
+    {
+        size_t i = 0;
+        char* p = NULL;  
+        size_t n = input->v.str.size;
+        expr_value_set_string(output, input->v.str.str, input->v.str.size);
+
+        p = output->v.str.str;
+        for(i = 0; i < n; i++) {
+            char c = p[i];
+            if(c == '/' || c == '\\') {
+                p[i] = DIRECTORY_SEPARATOR_CHAR;
+            }
+        }
+    }
+
+    return EVAL_RESULT_OK;
+}
+
 static EvalResult func_toupper(const ExprValue *input, void *user_data, ExprValue *output)
 {
     (void)user_data;
@@ -1262,6 +1290,7 @@ static EvalFunc default_get_func(const char *name, void *user_data)
         {
             {"number", func_number},
             {"strlen", func_strlen},
+            {"path", func_path},
             {"string", func_string},
             {"toupper", func_toupper},
             {"tolower", func_tolower},

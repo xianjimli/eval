@@ -94,6 +94,7 @@ int main()
 
     test_str("tolower(\"aBc\")", "abc");
     test_str("toupper(\"aBc\")", "ABC");
+    test_str("toupper(\"It Is Upper\")", "IT IS UPPER");
 
     return 0;
 }
