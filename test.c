@@ -55,14 +55,14 @@ int main()
     test_str("\"1\"|2", "1|2");
     
     /*number -> number*/
-    test_number("1 < 2", 1);
-    test_number("1 <= 2", 1);
-    test_number("1 == 2", 0);
-    test_number("1 >= 2", 0);
-    test_number("1 > 2", 0);
-    test_number("1 != 2", 1);
-    test_number("1 || 2", 1);
-    test_number("1 || 0", 1);
+    test_number("2 < 3", 1);
+    test_number("2 <= 3", 1);
+    test_number("2 == 3", 0);
+    test_number("2 >= 3", 0);
+    test_number("2 > 3", 0);
+    test_number("2 != 3", 1);
+    test_number("2 || 3", 1);
+    test_number("2 || 0", 1);
     test_number("1 && 0", 0);
     test_number("1 && !0", 1);
     test_number("!0", 1);

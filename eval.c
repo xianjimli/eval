@@ -453,6 +453,16 @@ static EvalResult expr_value_op(ExprValue *a, ExprValue *b, EvalTokenType op)
             a->v.val = a->v.val > b->v.val;
             break;
         }
+        case EVAL_TOKEN_TYPE_L:
+        {
+            a->v.val = a->v.val < b->v.val;
+            break;
+        }
+        case EVAL_TOKEN_TYPE_NE:
+        {
+            a->v.val = a->v.val != b->v.val;
+            break;
+        }
         case EVAL_TOKEN_TYPE_LE:
         {
             a->v.val = a->v.val <= b->v.val;
